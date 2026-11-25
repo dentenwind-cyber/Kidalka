@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+    <link rel="preconnect" href="https://www.gstatic.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title>Messenger</title>
+    <style>
+        :root {
+            --primary: #0084ff;
+            --bg: #f0f2f5;
+            --chat-bg: #e5ddd5;
+            --msg-out: #dcf8c6;
+            --text: #111b21;
+            --muted: #667781;
+        }
+
+        * {
+            box-sizing: border-box; margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body { height: 100%; }
+        body {
+            background: var(--bg);
+            min-height: 100dvh;
+            display: flex; justify-content: center; align-items: center;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ===== AUTH ===== */
+        .auth-container {
+            background: white; padding: 32px 24px; border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,.1); width: 100%; max-width: 400px; margin: 16px;
+        }
+        .auth-container h2 { margin-bottom: 20px; color: var(--primary); text-align: center; }
+        .auth-container input {
+            width: 100%; padding: 14px 16px; margin-bottom: 12px;
+            border: 1px solid #d1d7db; border-radius: 10px;
+            font-size: 16px; /* критично для iOS — иначе авто-зум рвёт фокус */
+            outline: none; background: #f7f8fa;
+        }
+        .auth-container input:focus { border-color: var(--primary); background: white; }
+        .auth-container button {
+            width: 100%; padding: 14px; background: var(--primary); color: white;
+            border: none; border-radius: 10px; font-size: 16px; cursor: pointer; margin-top: 4px;
+            touch-action: manipulation;
+        }
+        .auth-container button:active { background: #0066cc; }
+        .auth-toggle { text-align: center; color: var(--primary); cursor: pointer; font-size: 15px; margin-top: 14px; padding: 8px; }
+
+        /* ===== CHAT APP ===== */
+        .chat-app {
+            width: 100%; max-width: 1200px; height: 100dvh; background: white;
+            display: flex; overflow: hidden; position: relative;
+        }
+        @media (min-width: 769px) {
+            .chat-app { height: min(90dvh, 900px); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+        }
+
+        .sidebar {
+            width: 300px; background: #f7f7f7; border-right: 1px solid #ddd;
+            display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 14px 16px; background: var(--primary); color: white;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .sidebar-header h3 { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .logout-btn {
+            background: rgba(255,255,255,.2); border: none; color: white; padding: 8px 12px;
+            border-radius: 8px; cursor: pointer; font-size: .85rem; touch-action: manipulation; flex-shrink: 0;
+        }
+        .user-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .user-item {
+            padding: 12px 16px; border-bottom: 1px solid #eee; cursor: pointer;
+            display: flex; align-items: center; gap: 12px; min-height: 60px;
+        }
+        .user-item:active, .user-item.active { background: #d4e8ff; }
+        .user-avatar {
+            width: 44px; height: 44px; border-radius: 50%; background: var(--primary);
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 1.2rem; flex-shrink: 0;
+        }
+        .user-info { flex: 1; min-width: 0; }
+        .user-name { font-weight: 600; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .user-email { font-size: .8rem; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .chat-header {
+            padding: 12px 16px; background: var(--primary); color: white;
+            display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+            padding-bottom: calc(12px + env(safe-area-inset-top));
+        }
+        .back-btn {
+            display: none; background: none; border: none; color: white;
+            font-size: 1.6rem; cursor: pointer; padding: 4px 8px; touch-action: manipulation;
+        }
+        .chat-header h3 { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-header .user-avatar { width: 36px; height: 36px; font-size: 1rem; }
+
+        .messages-area {
+            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+            padding: 16px; background: var(--chat-bg);
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .message {
+            max-width: 75%; padding: 8px 12px; border-radius: 8px; position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,.1); animation: fadeIn .25s ease; word-wrap: break-word;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        .message.incoming { align-self: flex-start; background: white; border-top-left-radius: 0; }
+        .message.outgoing { align-self: flex-end; background: var(--msg-out); border-top-right-radius: 0; }
+        .message-image { max-width: 100%; border-radius: 6px; cursor: pointer; margin-bottom: 4px; display: block; }
+        .message-text { font-size: 15px; line-height: 1.4; color: var(--text); white-space: pre-wrap; }
+        .message-time { font-size: .7rem; color: var(--muted); text-align: right; margin-top: 4px; display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
+        .delete-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 2px 6px; touch-action: manipulation; }
+        .delete-btn:active { color: #ff3b30; }
+
+        .input-area {
+            background: #f0f2f5; padding: 10px 12px;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #d1d7db; flex-shrink: 0;
+        }
+        .preview-container {
+            position: relative; background: white; padding: 8px; border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,.1); display: inline-block; max-width: 160px;
+        }
+        .preview-container img { max-width: 100%; max-height: 120px; border-radius: 4px; display: block; }
+        .remove-btn {
+            position: absolute; top: -8px; right: -8px; background: #ff3b30; color: white;
+            border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer;
+            font-size: 1.2rem; display: flex; align-items: center; justify-content: center; touch-action: manipulation;
+        }
+        .input-row { display: flex; align-items: flex-end; gap: 8px; }
+        .icon-btn {
+            background: none; border: none; font-size: 1.5rem; cursor: pointer;
+            color: var(--muted); width: 44px; height: 44px; display: flex; align-items: center;
+            justify-content: center; border-radius: 50%; touch-action: manipulation; flex-shrink: 0;
+        }
+        textarea {
+            flex: 1; border: none; border-radius: 20px; padding: 12px 16px;
+            font-size: 16px; /* iOS anti-zoom */
+            resize: none; max-height: 120px; outline: none; background: white;
+            box-shadow: 0 1px 2px rgba(0,0,0,.1); line-height: 1.4;
+        }
+        .send-btn {
+            background: var(--primary); color: white; border: none; border-radius: 50%;
+            width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; font-size: 1.2rem; flex-shrink: 0; touch-action: manipulation;
+        }
+        .send-btn:disabled { background: #ccc; }
+
+        .no-chat-selected {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            color: var(--muted); font-size: 1rem; background: #f7f7f7; text-align: center; padding: 20px;
+        }
+
+        /* ===== MOBILE ===== */
+        @media (max-width: 768px) {
+            body { align-items: stretch; }
+            .chat-app { border-radius: 0; }
+            .sidebar {
+                position: absolute; inset: 0; width: 100%; z-index: 10;
+                transition: transform .25s ease;
+            }
+            .sidebar.mobile-hidden { transform: translateX(-100%); }
+            .back-btn { display: block; }
+            .message { max-width: 85%; }
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<!-- Auth -->
+<div class="auth-container" id="authScreen">
+    <h2 id="authTitle">Вход в мессенджер</h2>
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="email"
+           autocapitalize="none" spellcheck="false" inputmode="email">
+    <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
+    <input type="text" id="authName" placeholder="Имя (для регистрации)" class="hidden"
+           autocomplete="name" autocapitalize="words">
+    <button id="authSubmit">Войти</button>
+    <div class="auth-toggle" id="authToggle">Нет аккаунта? Зарегистрироваться</div>
+</div>
+
+<!-- Chat -->
+<div class="chat-app hidden" id="chatApp">
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3 id="currentUserName">…</h3>
+            <button class="logout-btn" id="logoutBtn">Выйти</button>
+        </div>
+        <div class="user-list" id="userList"></div>
+    </div>
+    <div class="chat-area">
+        <div class="no-chat-selected" id="noChatSelected">Выберите пользователя слева</div>
+        <div class="hidden" id="chatContent" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+            <div class="chat-header">
+                <button class="back-btn" id="backBtn">←</button>
+                <div class="user-avatar" id="chatAvatar">?</div>
+                <h3 id="chatUserName">Пользователь</h3>
+            </div>
+            <div class="messages-area" id="messagesArea"></div>
+            <div class="input-area">
+                <div class="preview-container hidden" id="previewContainer">
+                    <img id="imagePreview" src="" alt="">
+                    <button class="remove-btn" id="removePreview">×</button>
+                </div>
+                <div class="input-row">
+                    <input type="file" id="imageInput" accept="image/*" hidden>
+                    <button class="icon-btn" id="attachBtn">📎</button>
+                    <textarea id="messageInput" placeholder="Сообщение…" rows="1" enterkeyhint="send"></textarea>
+                    <button class="send-btn" id="sendBtn">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy,
+        serverTimestamp, deleteDoc, doc, setDoc, getDocs }
+        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAyN8ycq7QqptihkA5VGUk4FFxeNLfu3p4",
+        authDomain: "whahahaha-a952b.firebaseapp.com",
+        projectId: "whahahaha-a952b",
+        storageBucket: "whahahaha-a952b.firebasestorage.app",
+        messagingSenderId: "1085738594411",
+        appId: "1:1085738594411:web:cf59e5767982c9b662412e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null, selectedChatUser = null, currentImageBase64 = null,
+        isLoginMode = true, messagesUnsubscribe = null;
+
+    const $ = id => document.getElementById(id);
+    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+
+    /* ---------- AUTH ---------- */
+    $('authToggle').addEventListener('click', () => {
+        isLoginMode = !isLoginMode;
+        $('authTitle').textContent = isLoginMode ? 'Вход в мессенджер' : 'Регистрация';
+        $('authSubmit').textContent = isLoginMode ? 'Войти' : 'Зарегистрироваться';
+        $('authToggle').textContent = isLoginMode ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти';
+        $('authName').classList.toggle('hidden', isLoginMode);
+        $('authPassword').autocomplete = isLoginMode ? 'current-password' : 'new-password';
+    });
+
+    $('authSubmit').addEventListener('click', async () => {
+        const email = $('authEmail').value.trim();
+        const password = $('authPassword').value;
+        const name = $('authName').value.trim();
+        if (!email || !password) return alert('Заполните email и пароль');
+        try {
+            if (isLoginMode) {
+                await signInWithEmailAndPassword(auth, email, password);
+            } else {
+                if (!name) return alert('Введите имя');
+                const cred = await createUserWithEmailAndPassword(auth, email, password);
+                await setDoc(doc(db, "users", cred.user.uid), { email, name, createdAt: serverTimestamp() });
+            }
+        } catch (e) { alert('Ошибка: ' + e.message); }
+    });
+
+    $('logoutBtn').addEventListener('click', () => signOut(auth));
+
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUser = user;
+            $('authScreen').classList.add('hidden');
+            $('chatApp').classList.remove('hidden');
+            $('sidebar').classList.remove('mobile-hidden');
+            $('chatContent').classList.add('hidden');
+            $('noChatSelected').classList.remove('hidden');
+            loadUsers();
+            try {
+                const snap = await getDocs(query(collection(db, "users"), where("email", "==", user.email)));
+                if (!snap.empty) $('currentUserName').textContent = snap.docs[0].data().name;
+            } catch (e) { console.error(e); }
+        } else {
+            currentUser = null;
+            $('authScreen').classList.remove('hidden');
+            $('chatApp').classList.add('hidden');
+            if (messagesUnsubscribe) { messagesUnsubscribe(); messagesUnsubscribe = null; }
+        }
+    });
+
+    /* ---------- USERS ---------- */
+    function loadUsers() {
+        onSnapshot(collection(db, "users"), (snap) => {
+            $('userList').innerHTML = '';
+            snap.forEach(d => {
+                if (d.id === currentUser.uid) return;
+                const u = d.data();
+                const div = document.createElement('div');
+                div.className = 'user-item';
+                div.dataset.userId = d.id;
+                div.innerHTML = `<div class="user-avatar">${(u.name||'?').charAt(0).toUpperCase()}</div>
+                    <div class="user-info"><div class="user-name">${u.name}</div><div class="user-email">${u.email}</div></div>`;
+                div.addEventListener('click', () => openChat(d.id, u));
+                $('userList').appendChild(div);
+            });
+        });
+    }
+
+    function openChat(userId, user) {
+        selectedChatUser = { id: userId, ...user };
+        $('noChatSelected').classList.add('hidden');
+        $('chatContent').classList.remove('hidden');
+        $('chatUserName').textContent = user.name;
+        $('chatAvatar').textContent = (user.name||'?').charAt(0).toUpperCase();
+        document.querySelectorAll('.user-item').forEach(i => i.classList.toggle('active', i.dataset.userId === userId));
+        if (isMobile()) $('sidebar').classList.add('mobile-hidden');
+        loadMessages();
+    }
+
+    $('backBtn').addEventListener('click', () => {
+        selectedChatUser = null;
+        $('sidebar').classList.remove('mobile-hidden');
+        $('chatContent').classList.add('hidden');
+        $('noChatSelected').classList.remove('hidden');
+        document.querySelectorAll('.user-item').forEach(i => i.classList.remove('active'));
+        if (messagesUnsubscribe) { messagesUnsubscribe(); messagesUnsubscribe = null; }
+    });
+
+    /* ---------- MESSAGES ---------- */
+    const getChatId = (a, b) => a < b ? `${a}_${b}` : `${b}_${a}`;
+
+    function loadMessages() {
+        if (messagesUnsubscribe) messagesUnsubscribe();
+        const chatId = getChatId(currentUser.uid, selectedChatUser.id);
+        const q = query(collection(db, "messages"), where("chatId", "==", chatId), orderBy("timestamp", "asc"));
+        messagesUnsubscribe = onSnapshot(q, snap => {
+            $('messagesArea').innerHTML = '';
+            snap.forEach(d => renderMessage(d.data(), d.id));
+            $('messagesArea').scrollTop = $('messagesArea').scrollHeight;
+        }, err => {
+            if (err.code === 'failed-precondition') {
+                $('messagesArea').innerHTML = `<div style="color:#c00;padding:12px;text-align:center">Firestore просит создать индекс — открой консоль (F12), там будет ссылка, кликни по ней.</div>`;
+            }
+            console.error(err);
+        });
+    }
+
+    function renderMessage(msg, id) {
+        const div = document.createElement('div');
+        const isMe = msg.sender === currentUser.uid;
+        div.className = `message ${isMe ? 'outgoing' : 'incoming'}`;
+        let c = '';
+        if (msg.imageData) c += `<img src="${msg.imageData}" class="message-image" onclick="window.open(this.src)">`;
+        if (msg.text) c += `<div class="message-text">${escapeHtml(msg.text)}</div>`;
+        const t = msg.timestamp ? msg.timestamp.toDate().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '⏳';
+        if (isMe) c += `<button class="delete-btn" data-id="${id}">×</button>`;
+        c += `<div class="message-time">${t}</div>`;
+        div.innerHTML = c;
+        $('messagesArea').appendChild(div);
+    }
+
+    const escapeHtml = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+    async function sendMessage() {
+        const text = $('messageInput').value.trim();
+        if (!text && !currentImageBase64) return;
+        $('sendBtn').disabled = true;
+        try {
+            await addDoc(collection(db, "messages"), {
+                chatId: getChatId(currentUser.uid, selectedChatUser.id),
+                text, imageData: currentImageBase64, sender: currentUser.uid, timestamp: serverTimestamp()
+            });
+            resetInput();
+        } catch (e) { console.error(e); alert('Ошибка: ' + e.message); }
+        finally { $('sendBtn').disabled = false; }
+    }
+
+    function resetInput() {
+        $('messageInput').value = '';
+        $('messageInput').style.height = 'auto';
+        currentImageBase64 = null;
+        $('previewContainer').classList.add('hidden');
+        $('imagePreview').src = '';
+        $('imageInput').value = '';
+    }
+
+    $('sendBtn').addEventListener('click', sendMessage);
+    $('messageInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+    $('messageInput').addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; });
+
+    $('attachBtn').addEventListener('click', () => $('imageInput').click());
+    $('imageInput').addEventListener('change', e => e.target.files[0] && handleFile(e.target.files[0]));
+    $('removePreview').addEventListener('click', resetInput);
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) return alert('Выберите изображение');
+        if (file.size > 800 * 1024) return alert('Файл больше 800 КБ — выбери поменьше');
+        const r = new FileReader();
+        r.onload = e => { currentImageBase64 = e.target.result; $('imagePreview').src = currentImageBase64; $('previewContainer').classList.remove('hidden'); };
+        r.readAsDataURL(file);
+    }
+
+    $('messagesArea').addEventListener('click', e => {
+        if (e.target.classList.contains('delete-btn') && confirm('Удалить?')) deleteDoc(doc(db, "messages", e.target.dataset.id));
+    });
+
+    /* Клавиатура на телефоне: держим ленту прижатой к нижнему краю */
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const m = $('messagesArea');
+            if (m) m.scrollTop = m.scrollHeight;
+        });
+    }
+</script>
+</body>
+</html>
